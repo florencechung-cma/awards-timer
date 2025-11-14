@@ -72,7 +72,6 @@
       margin-top:16px; width:100%; height:8px; background:#0b1220; border-radius:999px; overflow:hidden; border:1px solid rgba(148,163,184,.18);
     }
     .bar{ height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s ease; }
-    /* 三鍵平排 */
     .btns{
       display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:18px; width:100%;
     }
@@ -100,8 +99,6 @@
       border:1px solid rgba(148,163,184,.3); border-bottom-width:2px;
       background:#0b1220; padding:2px 6px; border-radius:6px; color:#e5e7eb; font-size:12px;
     }
-
-    /* Fullscreen */
     :fullscreen .wrap, .wrap:fullscreen{
       max-width:none; width:100%; height:100%;
       display:flex; flex-direction:column; justify-content:space-between;
@@ -157,6 +154,15 @@
     let timerId = null;
     let lastTick = 0;
     let running = false;
+
+    // 多次蜂鳴設定
+    const buzzerConfig = {
+      count: 3,        // 嘟幾次
+      toneMs: 400,     // 每次嘟的持續時間
+      intervalMs: 250, // 嘟與嘟之間的間隔
+      freqStart: 880,  // 起始頻率
+      freqEnd: 660     // 結束頻率（做一點下滑效果更醒目）
+    };
 
     // 元件
     const elTime = document.getElementById('time');
@@ -250,8 +256,8 @@
         running = false;
         elStatus.innerHTML = '時間到！';
         elTime.classList.add('blink');
-        // 不退出全螢幕：僅通知與蜂鳴，不呼叫 exitFullscreen
-        notify();
+        notify();      // 桌面通知
+        beepSeries();  // 多次嘟聲
         return;
       }
       timerId = requestAnimationFrame(tick);
@@ -311,7 +317,7 @@
       return `${hh}:${mm}:${ss}`;
     }
 
-    // 到點提醒（通知 + 內建蜂鳴音）
+    // 到點提醒（通知）
     async function notify(){
       try{
         if ('Notification' in window){
@@ -325,19 +331,43 @@
           }
         }
       }catch(e){}
+    }
 
+    // 多次嘟聲蜂鳴
+    async function beepSeries(cfg = buzzerConfig){
       try{
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'triangle';
-        o.frequency.value = 880;
-        g.gain.setValueAtTime(0.0001, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
-        o.connect(g).connect(ctx.destination);
-        o.start();
-        o.stop(ctx.currentTime + 0.62);
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+
+        // 一次「嘟」的封裝
+        const beepOnce = (startAt) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'square'; // 更尖銳，像計時器
+          o.frequency.setValueAtTime(cfg.freqStart, startAt);
+          // 做一個簡單滑音
+          o.frequency.exponentialRampToValueAtTime(cfg.freqEnd, startAt + cfg.toneMs/1000);
+
+          // 音量包絡，避免爆音
+          g.gain.setValueAtTime(0.0001, startAt);
+          g.gain.exponentialRampToValueAtTime(0.25, startAt + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, startAt + cfg.toneMs/1000);
+
+          o.connect(g).connect(ctx.destination);
+          o.start(startAt);
+          o.stop(startAt + cfg.toneMs/1000 + 0.02);
+        };
+
+        const now = ctx.currentTime;
+        for (let i = 0; i < cfg.count; i++){
+          const t = now + i * ((cfg.toneMs + cfg.intervalMs)/1000);
+          beepOnce(t);
+        }
+
+        // 自動在最後一聲後關閉音訊（節省資源）
+        const totalDur = (cfg.count - 1) * (cfg.toneMs + cfg.intervalMs) + cfg.toneMs;
+        setTimeout(() => { try{ ctx.close(); }catch(e){} }, totalDur + 500);
       }catch(e){}
     }
   </script>

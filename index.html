@@ -37,19 +37,12 @@
     header{
       display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;
     }
-    .title{
-      font-weight:700; letter-spacing:.2px; font-size:18px;
-    }
-    .preset{
-      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
-    }
-    .preset label{
-      font-size:12px; color:var(--muted);
-    }
+    .title{ font-weight:700; letter-spacing:.2px; font-size:18px; }
+    .preset{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .preset label{ font-size:12px; color:var(--muted); }
     .preset input{
       width:68px; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25);
-      background:#0b1220; color:var(--text); outline:none;
-      -moz-appearance: textfield;
+      background:#0b1220; color:var(--text); outline:none; -moz-appearance: textfield;
     }
     .preset input::-webkit-outer-spin-button,
     .preset input::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0; }
@@ -72,25 +65,18 @@
       margin-top:16px; width:100%; height:8px; background:#0b1220; border-radius:999px; overflow:hidden; border:1px solid rgba(148,163,184,.18);
     }
     .bar{ height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s ease; }
-    .btns{
-      display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:18px; width:100%;
-    }
+    .btns{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:18px; width:100%; }
     button{
       padding:12px 14px; border-radius:12px; border:1px solid transparent;
       background:#1f2937; color:var(--text); font-weight:700; letter-spacing:.2px; cursor:pointer;
-      transition:.2s transform, .2s filter, .2s background, .2s border-color;
-      outline:none; min-width:0;
+      transition:.2s transform, .2s filter, .2s background, .2s border-color; outline:none; min-width:0;
     }
     button:active{ transform: translateY(1px) scale(.997); }
     .primary{ background: linear-gradient(180deg, #10b981, #059669); border-color:#0e9f6e; }
     .secondary{ background: linear-gradient(180deg, #3b82f6, #2563eb); border-color:#3b82f6; }
     .danger{ background: linear-gradient(180deg, #ef4444, #dc2626); border-color:#ef4444; }
     .ghost{ background:#111827; border-color:rgba(148,163,184,.25); }
-    .blink{
-      animation: blink 1s step-end infinite;
-      color:#fffbeb;
-      text-shadow: 0 0 8px rgba(245, 158, 11, .9);
-    }
+    .blink{ animation: blink 1s step-end infinite; color:#fffbeb; text-shadow: 0 0 8px rgba(245, 158, 11, .9); }
     @keyframes blink{ 50%{opacity:.3} }
     .small{ font-size:12px; color:var(--muted); }
     footer{ margin-top:14px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
@@ -99,21 +85,10 @@
       border:1px solid rgba(148,163,184,.3); border-bottom-width:2px;
       background:#0b1220; padding:2px 6px; border-radius:6px; color:#e5e7eb; font-size:12px;
     }
-    :fullscreen .wrap, .wrap:fullscreen{
-      max-width:none; width:100%; height:100%;
-      display:flex; flex-direction:column; justify-content:space-between;
-      background:rgba(17,24,39,.7);
-    }
-    :fullscreen .time, .wrap:fullscreen .time{
-      font-size:min(16vw, 160px);
-      letter-spacing:4px; margin:16px 0 8px;
-    }
-    :fullscreen .btns, .wrap:fullscreen .btns{
-      grid-template-columns: repeat(3, 1fr); gap:12px;
-    }
-    :fullscreen .btns button, .wrap:fullscreen .btns button{
-      padding:16px 18px; font-size:18px;
-    }
+    :fullscreen .wrap, .wrap:fullscreen{ max-width:none; width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-between; background:rgba(17,24,39,.7); }
+    :fullscreen .time, .wrap:fullscreen .time{ font-size:min(16vw, 160px); letter-spacing:4px; margin:16px 0 8px; }
+    :fullscreen .btns, .wrap:fullscreen .btns{ grid-template-columns: repeat(3, 1fr); gap:12px; }
+    :fullscreen .btns button, .wrap:fullscreen .btns button{ padding:16px 18px; font-size:18px; }
   </style>
 </head>
 <body>
@@ -155,13 +130,17 @@
     let lastTick = 0;
     let running = false;
 
-    // 多次蜂鳴設定
-    const buzzerConfig = {
-      count: 3,        // 嘟幾次
-      toneMs: 400,     // 每次嘟的持續時間
-      intervalMs: 250, // 嘟與嘟之間的間隔
-      freqStart: 880,  // 起始頻率
-      freqEnd: 660     // 結束頻率（做一點下滑效果更醒目）
+    // 鬧鐘音效設定
+    const alarmConfig = {
+      pairs: 4,          // 叮噹對數（一次包含兩下：ding + dang），越多越長
+      hitMs: 180,        // 每一下的時長（毫秒）
+      gapMs: 120,        // 一下與一下間的間隔
+      pairGapMs: 220,    // 一對之間的額外間隔
+      freqA: 1400,       // 「叮」的頻率（較高）
+      freqB: 900,        // 「噹」的頻率（較低）
+      waveformA: 'square',
+      waveformB: 'sawtooth',
+      drive: 0.35        // 失真強度 0~1（越大越刺耳）
     };
 
     // 元件
@@ -193,11 +172,7 @@
       if (e.key === 'r' || e.key === 'R'){ e.preventDefault(); resetToPreset(); }
       if (e.key === 'f' || e.key === 'F'){ e.preventDefault(); toggleFullscreen(); }
     });
-
-    // 監聽全螢幕狀態變化
-    ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
-      document.addEventListener(ev, updateFsButton);
-    });
+    ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>document.addEventListener(ev, updateFsButton));
 
     // 主邏輯
     function start(){
@@ -208,18 +183,13 @@
       elStatus.textContent = '計時中…';
       tick();
     }
-
     function pause(){
       if (!running) return;
       running = false;
       cancelAnimationFrame(timerId);
       elStatus.textContent = '已暫停';
     }
-
-    function toggle(){
-      running ? pause() : start();
-    }
-
+    function toggle(){ running ? pause() : start(); }
     function resetToPreset(){
       running = false;
       cancelAnimationFrame(timerId);
@@ -227,7 +197,6 @@
       elStatus.textContent = '已重置至預設時間';
       syncDisplay();
     }
-
     function applyPresetFromInputs(){
       const h = clampInt(elHH.value, 0, 99);
       const m = clampInt(elMM.value, 0, 59);
@@ -242,27 +211,23 @@
         elStatus.textContent = '已更新預設時間（重置後生效）';
       }
     }
-
     function tick(){
       if (!running) return;
       const now = performance.now();
       const delta = now - lastTick;
       lastTick = now;
-
       remainingMs = Math.max(0, remainingMs - delta);
       syncDisplay();
-
       if (remainingMs <= 0){
         running = false;
-        elStatus.innerHTML = '時間到！';
+        elStatus.textContent = '時間到！';
         elTime.classList.add('blink');
-        notify();      // 桌面通知
-        beepSeries();  // 多次嘟聲
+        notify();
+        alarmSeries(); // 鬧鐘聲
         return;
       }
       timerId = requestAnimationFrame(tick);
     }
-
     function syncDisplay(){
       elTime.classList.toggle('blink', remainingMs <= 0);
       elTime.textContent = fmt(remainingMs);
@@ -271,26 +236,10 @@
     }
 
     // 全螢幕
-    function isFullscreen(){
-      return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-    }
-    function requestFs(el){
-      if (el.requestFullscreen) return el.requestFullscreen();
-      if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
-      if (el.msRequestFullscreen) return el.msRequestFullscreen();
-    }
-    function exitFs(){
-      if (document.exitFullscreen) return document.exitFullscreen();
-      if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
-      if (document.msExitFullscreen) return document.msExitFullscreen();
-    }
-    function toggleFullscreen(){
-      if (isFullscreen()){
-        exitFs();
-      } else {
-        requestFs(container);
-      }
-    }
+    function isFullscreen(){ return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement; }
+    function requestFs(el){ if (el.requestFullscreen) return el.requestFullscreen(); if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen(); if (el.msRequestFullscreen) return el.msRequestFullscreen(); }
+    function exitFs(){ if (document.exitFullscreen) return document.exitFullscreen(); if (document.webkitExitFullscreen) return document.webkitExitFullscreen(); if (document.msExitFullscreen) return document.msExitFullscreen(); }
+    function toggleFullscreen(){ isFullscreen() ? exitFs() : requestFs(container); }
     function updateFsButton(){
       const fs = !!isFullscreen();
       elFs.textContent = fs ? '退出全螢幕' : '進入全螢幕';
@@ -299,25 +248,17 @@
 
     // 工具
     function toMs({h=0,m=0,s=0}){ return ((+h||0)*3600 + (+m||0)*60 + (+s||0)) * 1000; }
-    function clampInt(v, min, max){
-      v = Math.floor(Math.abs(parseInt(v,10)||0));
-      if (v < min) v = min;
-      if (v > max) v = max;
-      return v;
-    }
+    function clampInt(v, min, max){ v = Math.floor(Math.abs(parseInt(v,10)||0)); if (v < min) v = min; if (v > max) v = max; return v; }
     function fmt(ms){
       ms = Math.max(0, Math.floor(ms));
       const totalSec = Math.floor(ms/1000);
       const h = Math.floor(totalSec / 3600);
       const m = Math.floor((totalSec % 3600)/60);
       const s = totalSec % 60;
-      const hh = h.toString().padStart(2,'0');
-      const mm = m.toString().padStart(2,'0');
-      const ss = s.toString().padStart(2,'0');
-      return `${hh}:${mm}:${ss}`;
+      return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 
-    // 到點提醒（通知）
+    // 桌面通知
     async function notify(){
       try{
         if ('Notification' in window){
@@ -333,41 +274,65 @@
       }catch(e){}
     }
 
-    // 多次嘟聲蜂鳴
-    async function beepSeries(cfg = buzzerConfig){
+    // 鬧鐘聲：叮噹交替 + 輕微失真，更接近傳統鬧鐘
+    async function alarmSeries(cfg = alarmConfig){
       try{
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return;
         const ctx = new AudioCtx();
 
-        // 一次「嘟」的封裝
-        const beepOnce = (startAt) => {
+        // 簡易波形整形（失真）
+        const waveshaper = ctx.createWaveShaper();
+        waveshaper.curve = makeDistortionCurve(400 * cfg.drive);
+        waveshaper.oversample = '4x';
+
+        const master = ctx.createGain();
+        master.gain.value = 0.15; // 全域音量
+        waveshaper.connect(master).connect(ctx.destination);
+
+        const hit = (startAt, freq, waveform) => {
           const o = ctx.createOscillator();
+          o.type = waveform;
+          o.frequency.setValueAtTime(freq, startAt);
+
           const g = ctx.createGain();
-          o.type = 'square'; // 更尖銳，像計時器
-          o.frequency.setValueAtTime(cfg.freqStart, startAt);
-          // 做一個簡單滑音
-          o.frequency.exponentialRampToValueAtTime(cfg.freqEnd, startAt + cfg.toneMs/1000);
-
-          // 音量包絡，避免爆音
+          // 打擊包絡：瞬間起音，快速衰減，尾巴短
           g.gain.setValueAtTime(0.0001, startAt);
-          g.gain.exponentialRampToValueAtTime(0.25, startAt + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001, startAt + cfg.toneMs/1000);
+          g.gain.exponentialRampToValueAtTime(0.9, startAt + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.0001, startAt + cfg.hitMs/1000);
 
-          o.connect(g).connect(ctx.destination);
+          o.connect(g).connect(waveshaper);
           o.start(startAt);
-          o.stop(startAt + cfg.toneMs/1000 + 0.02);
+          o.stop(startAt + cfg.hitMs/1000 + 0.05);
         };
 
         const now = ctx.currentTime;
-        for (let i = 0; i < cfg.count; i++){
-          const t = now + i * ((cfg.toneMs + cfg.intervalMs)/1000);
-          beepOnce(t);
+        let t = now;
+
+        for (let i=0; i<cfg.pairs; i++){
+          // 叮
+          hit(t, cfg.freqA, cfg.waveformA);
+          t += (cfg.hitMs + cfg.gapMs) / 1000;
+          // 噹
+          hit(t, cfg.freqB, cfg.waveformB);
+          t += (cfg.hitMs + cfg.pairGapMs) / 1000;
         }
 
-        // 自動在最後一聲後關閉音訊（節省資源）
-        const totalDur = (cfg.count - 1) * (cfg.toneMs + cfg.intervalMs) + cfg.toneMs;
-        setTimeout(() => { try{ ctx.close(); }catch(e){} }, totalDur + 500);
+        // 自動收尾
+        const total = cfg.pairs * (cfg.hitMs*2 + cfg.gapMs + cfg.pairGapMs);
+        setTimeout(()=>{ try{ ctx.close(); }catch(_){} }, total + 500);
+
+        // 工具：產生失真曲線
+        function makeDistortionCurve(amount=50){
+          const n = 44100;
+          const curve = new Float32Array(n);
+          const deg = Math.PI / 180;
+          for (let i=0; i<n; ++i){
+            const x = i*2/n - 1;
+            curve[i] = (3+amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x));
+          }
+          return curve;
+        }
       }catch(e){}
     }
   </script>

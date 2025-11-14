@@ -3,18 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>倒計時器（自選手機鬧鐘音檔）</title>
+  <title>倒計時器（Radar 精簡：4秒、乾淨、逐步變大）</title>
   <style>
     :root{ --bg:#0f172a; --text:#e5e7eb; --muted:#9ca3af; --ring: rgba(59,130,246,.35); }
     *{box-sizing:border-box} html,body{height:100%}
     body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,Arial;background:#0f172a;color:var(--text);display:flex;align-items:center;justify-content:center;padding:16px}
-    .wrap{width:100%;max-width:700px;background:rgba(17,24,39,.6);backdrop-filter:blur(8px);border:1px solid rgba(148,163,184,.15);border-radius:16px;padding:20px}
+    .wrap{width:100%;max-width:680px;background:rgba(17,24,39,.6);backdrop-filter:blur(8px);border:1px solid rgba(148,163,184,.15);border-radius:16px;padding:20px}
     header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     label{font-size:12px;color:var(--muted)}
     input,button{border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#0b1220;color:var(--text);outline:none}
-    input[type="number"]{padding:8px 10px;width:72px}
-    input:focus,button:focus{box-shadow:0 0 0 4px var(--ring)}
+    input{padding:8px 10px;width:72px} input:focus{box-shadow:0 0 0 4px var(--ring)}
     button{padding:10px 12px;cursor:pointer}
     .screen{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border:1px solid rgba(148,163,184,.12);border-radius:14px}
     .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:64px;letter-spacing:2px}
@@ -24,15 +23,13 @@
     .hint{font-size:12px;color:var(--muted)}
     .blink{animation:blink 1s step-end infinite;color:#fffbeb;text-shadow:0 0 8px rgba(245,158,11,.9)}
     @keyframes blink{50%{opacity:.3}}
-    .file-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
-    .file-name{font-size:12px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   </style>
 </head>
 <body>
   <div class="wrap" id="container">
     <header>
       <div class="row">
-        <label>預設時間</label>
+        <label>預設</label>
         <input id="hh" type="number" min="0" step="1" value="0" aria-label="小時" />
         <input id="mm" type="number" min="0" max="59" step="1" value="1" aria-label="分鐘" />
         <input id="ss" type="number" min="0" max="59" step="1" value="30" aria-label="秒" />
@@ -47,19 +44,6 @@
       <div id="time" class="time">00:01:30</div>
       <div id="status" class="hint">已就緒</div>
       <div class="progress"><div id="bar" class="bar"></div></div>
-
-      <div class="file-row">
-        <input id="file" type="file" accept="audio/*,.m4a,.aac,.mp3,.wav,.ogg" />
-        <span id="fileName" class="file-name">尚未選擇音檔</span>
-        <button id="test">試播</button>
-        <label style="display:flex;align-items:center;gap:6px">
-          音量 <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" />
-        </label>
-        <label style="display:flex;align-items:center;gap:6px">
-          循環 <input id="loop" type="checkbox" />
-        </label>
-      </div>
-
       <div class="btns">
         <button id="start">開始</button>
         <button id="pause">暫停</button>
@@ -68,8 +52,6 @@
       <div class="hint">Space 開始/暫停，R 重置，F 全螢幕</div>
     </section>
   </div>
-
-  <audio id="player" preload="auto" crossorigin="anonymous"></audio>
 
   <script>
     // 計時狀態
@@ -91,17 +73,8 @@
     const elFs = document.getElementById('fs');
     const container = document.getElementById('container');
 
-    // 音檔
-    const fileInput = document.getElementById('file');
-    const fileName = document.getElementById('fileName');
-    const player = document.getElementById('player');
-    const testBtn = document.getElementById('test');
-    const vol = document.getElementById('vol');
-    const loop = document.getElementById('loop');
-
     // 初始化
     sync();
-    player.volume = parseFloat(vol.value) || 0.8;
 
     // 事件
     elStart.onclick = start;
@@ -109,35 +82,13 @@
     elReset.onclick = resetToPreset;
     elApply.onclick = applyPreset;
     elFs.onclick = toggleFullscreen;
-
     document.addEventListener('keydown', e=>{
       if (e.code==='Space'){ e.preventDefault(); running?pause():start(); }
       if (e.key==='r'||e.key==='R'){ e.preventDefault(); resetToPreset(); }
       if (e.key==='f'||e.key==='F'){ e.preventDefault(); toggleFullscreen(); }
     });
 
-    fileInput.onchange = () => {
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) { fileName.textContent = '尚未選擇音檔'; player.removeAttribute('src'); return; }
-      const url = URL.createObjectURL(file);
-      player.src = url;
-      fileName.textContent = file.name;
-      elStatus.textContent = '已載入音檔';
-    };
-
-    testBtn.onclick = () => {
-      if (!player.src){ elStatus.textContent = '請先選擇音檔'; return; }
-      safePlay();
-    };
-
-    vol.oninput = () => {
-      player.volume = parseFloat(vol.value) || 0.8;
-    };
-    loop.onchange = () => {
-      player.loop = loop.checked;
-    };
-
-    // 計時
+    // 計時邏輯
     function start(){
       if (running) return;
       if (remainingMs<=0) remainingMs = presetMs;
@@ -162,7 +113,7 @@
         elStatus.textContent='時間到！';
         elTime.classList.add('blink');
         notify();
-        safePlay();
+        playRadarClean4s();
         return;
       }
       timerId = requestAnimationFrame(tick);
@@ -177,7 +128,7 @@
     // 全螢幕
     function isFs(){ return document.fullscreenElement || document.webkitFullscreenElement; }
     function reqFs(el){ if (el.requestFullscreen) return el.requestFullscreen(); if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen(); }
-    function exitFs(){ if (document.exitFullscreen) return document.exitFullscreen(); if (el.webkitExitFullscreen) return document.webkitExitFullscreen(); }
+    function exitFs(){ if (document.exitFullscreen) return document.exitFullscreen(); if (document.webkitExitFullscreen) return document.webkitExitFullscreen(); }
     function toggleFullscreen(){ isFs()?exitFs():reqFs(container); }
 
     // 工具
@@ -186,15 +137,83 @@
     function fmt(ms){ ms=Math.max(0,Math.floor(ms)); const t=Math.floor(ms/1000), h=Math.floor(t/3600), m=Math.floor((t%3600)/60), s=t%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
     async function notify(){ try{ if('Notification'in window){ if(Notification.permission==='granted'){ new Notification('倒計時結束',{body:'時間到！'}); } else if(Notification.permission!=='denied'){ const p=await Notification.requestPermission(); if(p==='granted') new Notification('倒計時結束',{body:'時間到！'}); }}}catch(e){} }
 
-    // 音訊播放（處理自動播放限制）
-    async function safePlay(){
-      try{
-        // 部分瀏覽器需要使用者互動後才能播放
-        const p = player.play();
-        if (p && typeof p.then === 'function'){ await p; }
-      }catch(err){
-        elStatus.textContent = '自動播放被阻擋，請點擊「試播」或按播放按鈕';
+    // ====== Radar 精簡：4秒、乾淨、逐步變大 ======
+    function ctxOrNull(){ const AC = window.AudioContext || window.webkitAudioContext; return AC ? new AC() : null; }
+
+    function playRadarClean4s(){
+      const ctx = ctxOrNull(); if(!ctx) return;
+
+      const cfg = {
+        duration: 4.0,       // 總長度 4 秒
+        onMs: 150,           // 每個「嘟」長度（短促）
+        offMs: 70,           // 間隔
+        fStart: 1000,        // 掃頻起點
+        fEnd: 3000,          // 掃頻終點（尖銳）
+        baseVol: 0.16,       // 初始音量
+        stepDb: 1.8,         // 每拍增幅（dB）
+        limitDb: -2,         // 最高限幅（避免破音）
+        hpHz: 500,           // 高通
+        hsHz: 4200,          // 高架濾波位置
+        hsGain: 3.5          // 高頻微提升
+      };
+
+      // 主路由（乾聲，無噪音無回聲）
+      const out = ctx.createGain(); out.gain.value = 1.0;
+
+      // 乾淨 EQ：高通 + 高架
+      const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = cfg.hpHz; hp.Q.value = 0.7;
+      const hs = ctx.createBiquadFilter(); hs.type='highshelf'; hs.frequency.value = cfg.hsHz; hs.gain.value = cfg.hsGain;
+
+      out.connect(hp); hp.connect(hs);
+
+      // 簡易限幅（軟削波，避免逐步變大到破）
+      const sh = ctx.createWaveShaper(); sh.curve = distortionCurve(140);
+      hs.connect(sh).connect(ctx.destination);
+
+      function dbToGain(db){ return Math.pow(10, db/20); }
+      function distortionCurve(amount=50){ const n=44100, curve=new Float32Array(n), deg=Math.PI/180; for(let i=0;i<n;i++){ const x=i*2/n-1; curve[i]=(3+amount)*x*20*deg/(Math.PI+amount*Math.abs(x)); } return curve; }
+
+      // 計算總共能放幾個「嘟」
+      const period = (cfg.onMs + cfg.offMs)/1000;
+      const now = ctx.currentTime;
+      const endT = now + cfg.duration;
+      let t = now, idx = 0;
+
+      // 每個「嘟」：鋸齒掃頻 + 快速包絡 + 輕微抖動（很小，避免雜聲）
+      function oneBeep(startTime, gainMul){
+        const o = ctx.createOscillator(); o.type='sawtooth';
+        o.frequency.setValueAtTime(cfg.fStart, startTime);
+        o.frequency.exponentialRampToValueAtTime(cfg.fEnd, startTime + cfg.onMs/1000);
+
+        // 很輕微 LFO 抖動，僅 6Hz、±6Hz，保留尖銳不製造雜訊
+        const lfo = ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value = 6;
+        const lfoGain = ctx.createGain(); lfoGain.gain.value = 6;
+        lfo.connect(lfoGain).connect(o.frequency);
+
+        const g = ctx.createGain();
+        const a = 0.004;
+        const d = Math.max(0.03, cfg.onMs/1000 - 0.015);
+        g.gain.setValueAtTime(0.0001, startTime);
+        g.gain.exponentialRampToValueAtTime(gainMul, startTime + a);
+        g.gain.exponentialRampToValueAtTime(0.0001, startTime + d);
+
+        o.connect(g).connect(out);
+
+        o.start(startTime); lfo.start(startTime);
+        o.stop(startTime + cfg.onMs/1000 + 0.05);
+        lfo.stop(startTime + cfg.onMs/1000 + 0.10);
       }
+
+      // 排程嘟
+      while (t < endT){
+        const gain = cfg.baseVol * dbToGain(cfg.stepDb * idx);
+        oneBeep(t, gain);
+        idx++;
+        t += period;
+      }
+
+      // 關閉音訊
+      setTimeout(()=>{ try{ ctx.close(); }catch(e){} }, cfg.duration*1000 + 400);
     }
   </script>
 </body>

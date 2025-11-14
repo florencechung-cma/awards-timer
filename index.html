@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>倒計時器（使用 alarm.mp3）</title>
-  <meta name="description" content="可自訂時間、全螢幕、桌面通知；時間到播放 alarm.mp3（可多次）。" />
+  <title>倒計時器（置中＆alarm.mp3）</title>
+  <meta name="description" content="可自訂時間、全螢幕、桌面通知；時間到播放 alarm.mp3（可多次）。全螢幕置中顯示。" />
   <style>
     :root{
       --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --muted:#9ca3af;
@@ -14,15 +14,32 @@
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial;
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial;
       background: radial-gradient(1200px 800px at 80% -10%, #1f2937 0%, var(--bg) 60%);
-      color:var(--text); display:flex; align-items:center; justify-content:center; padding:16px;
+      color:var(--text);
+      display:flex;
+      align-items:center;          /* 垂直置中 */
+      justify-content:center;      /* 水平置中 */
+      padding:16px;
+      min-height:100vh;
     }
     .wrap{
-      width:100%; max-width:560px; background:rgba(17,24,39,.65); backdrop-filter: blur(8px);
-      border:1px solid rgba(148,163,184,.15); border-radius:16px; padding:20px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      width:100%;
+      max-width:560px;
+      background:rgba(17,24,39,.65);
+      backdrop-filter: blur(8px);
+      border:1px solid rgba(148,163,184,.15);
+      border-radius:16px;
+      padding:20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      display:flex;
+      flex-direction:column;
+      gap:14px;
     }
-    header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    }
     .title{ font-weight:700; letter-spacing:.2px; font-size:18px; }
     .preset{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .preset label{ font-size:12px; color:var(--muted); }
@@ -38,7 +55,8 @@
       border:1px solid rgba(148,163,184,.12);
     }
     .time{
-      font-variant-numeric: tabular-nums; font-size:64px; font-weight:800; letter-spacing:2px; line-height:1; margin:12px 0 6px; user-select:none;
+      font-variant-numeric: tabular-nums; font-size:64px; font-weight:800; letter-spacing:2px;
+      line-height:1; margin:12px 0 6px; user-select:none;
     }
     @media (max-width:420px){ .time{ font-size:48px; } }
     .hint{ font-size:12px; color:var(--muted); }
@@ -55,14 +73,44 @@
     .secondary{ background: linear-gradient(180deg, #3b82f6, #2563eb); border-color:#3b82f6; }
     .danger{ background: linear-gradient(180deg, #ef4444, #dc2626); border-color:#ef4444; }
     .ghost{ background:#111827; border-color:rgba(148,163,184,.25); }
-    .blink{
-      animation: blink 1s step-end infinite; color:#fffbeb; text-shadow: 0 0 8px rgba(245, 158, 11, .9);
-    }
+    .blink{ animation: blink 1s step-end infinite; color:#fffbeb; text-shadow:0 0 8px rgba(245,158,11,.9); }
     @keyframes blink{ 50%{opacity:.3} }
     .small{ font-size:12px; color:var(--muted); }
-    footer{ margin-top:14px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
-    .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      border:1px solid rgba(148,163,184,.3); border-bottom-width:2px; background:#0b1220; padding:2px 6px; border-radius:6px; color:#e5e7eb; font-size:12px; }
+    footer{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+
+    /* 全螢幕：用三列網格布局，讓 screen 永遠在中間置中 */
+    :fullscreen .wrap, .wrap:fullscreen{
+      max-width:none; width:100%; height:100%;
+      background:rgba(17,24,39,.7);
+      display:grid;
+      grid-template-rows: auto 1fr auto; /* header / screen / footer */
+      justify-items:center;             /* 水平置中每列內容 */
+      align-items:stretch;
+      padding:24px;
+      box-sizing:border-box;
+      gap:16px;
+    }
+    :fullscreen header, .wrap:fullscreen header,
+    :fullscreen footer, .wrap:fullscreen footer{
+      width:100%;
+      max-width:1200px;
+    }
+    :fullscreen .screen, .wrap:fullscreen .screen{
+      width:100%;
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;   /* 垂直置中 screen 內容 */
+      align-items:center;       /* 水平置中 screen 內容 */
+    }
+    :fullscreen .time, .wrap:fullscreen .time{
+      font-size:min(16vw, 160px);
+      letter-spacing:4px;
+      margin:16px 0 8px;
+    }
+    :fullscreen .btns, .wrap:fullscreen .btns{ grid-template-columns: repeat(3, 1fr); gap:12px; }
+    :fullscreen .btns button, .wrap:fullscreen .btns button{ padding:16px 18px; font-size:18px; }
   </style>
 </head>
 <body>
@@ -108,13 +156,8 @@
     let running = false;
 
     // 鈴聲播放設定
-    const chime = {
-      times: 3,        // 播放幾次
-      intervalMs: 300, // 次與次的間隔（毫秒）
-      volume: 1.0      // 0~1 音量
-    };
-    const bell = document.getElementById('bell');
-    bell.volume = chime.volume;
+    const chime = { times: 3, intervalMs: 300, volume: 1.0 };
+    const bell = document.getElementById('bell'); bell.volume = chime.volume;
 
     // 元件
     const elTime = document.getElementById('time');
@@ -144,6 +187,9 @@
       if (e.code === 'Space'){ e.preventDefault(); unlockAudio(); toggle(); }
       if (e.key === 'r' || e.key === 'R'){ e.preventDefault(); resetToPreset(); }
       if (e.key === 'f' || e.key === 'F'){ e.preventDefault(); toggleFullscreen(); }
+    });
+    ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
+      document.addEventListener(ev, updateFsButton);
     });
 
     // 主邏輯
@@ -176,23 +222,18 @@
       elHH.value = h; elMM.value = m; elSS.value = s;
       presetMs = toMs({h, m, s});
       if (!running){
-        remainingMs = presetMs;
-        syncDisplay();
-        elStatus.textContent = '已更新預設時間';
-      } else {
+        remainingMs = presetMs; syncDisplay(); elStatus.textContent = '已更新預設時間';
+      }else{
         elStatus.textContent = '已更新預設時間（重置後生效）';
       }
     }
-
     function tick(){
       if (!running) return;
       const now = performance.now();
       const delta = now - lastTick;
       lastTick = now;
-
       remainingMs = Math.max(0, remainingMs - delta);
       syncDisplay();
-
       if (remainingMs <= 0){
         running = false;
         elStatus.textContent = '時間到！';
@@ -203,7 +244,6 @@
       }
       timerId = requestAnimationFrame(tick);
     }
-
     function syncDisplay(){
       elTime.classList.toggle('blink', remainingMs <= 0);
       elTime.textContent = fmt(remainingMs);
@@ -214,7 +254,6 @@
     // 多次播放音檔
     async function playChimeTimes(){
       try{
-        // 確保已可播放
         if (bell.readyState < 2){
           await bell.play().then(()=>bell.pause()).catch(()=>{});
           bell.currentTime = 0;
@@ -222,7 +261,6 @@
         for (let i = 0; i < chime.times; i++){
           setTimeout(()=>{
             try{
-              // 使用 cloneNode 以避免上一聲尚未結束時被打斷
               const a = bell.cloneNode(true);
               a.volume = bell.volume;
               a.addEventListener('ended', ()=> a.remove());
@@ -234,7 +272,7 @@
       }catch(e){}
     }
 
-    // 嘗試在使用者互動後解鎖音訊政策
+    // 音訊解鎖
     let audioUnlocked = false;
     function unlockAudio(){
       if (audioUnlocked) return;
@@ -242,10 +280,8 @@
         const p = bell.play();
         if (p && typeof p.then === 'function'){
           p.then(()=>{ bell.pause(); bell.currentTime = 0; audioUnlocked = true; })
-           .catch(()=>{ /* 若被阻擋，之後再試 */ });
-        } else {
-          audioUnlocked = true;
-        }
+           .catch(()=>{});
+        } else { audioUnlocked = true; }
       }catch(e){}
     }
 
@@ -262,38 +298,20 @@
       }catch(e){}
     }
 
-    // 全螢幕
-    function isFullscreen(){
-      return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-    }
-    function requestFs(el){
-      if (el.requestFullscreen) return el.requestFullscreen();
-      if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
-      if (el.msRequestFullscreen) return el.msRequestFullscreen();
-    }
-    function exitFs(){
-      if (document.exitFullscreen) return document.exitFullscreen();
-      if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
-      if (document.msExitFullscreen) return document.msExitFullscreen();
-    }
-    function toggleFullscreen(){
-      if (isFullscreen()){ exitFs(); } else { requestFs(container); }
-    }
+    // 全螢幕控制
+    function isFullscreen(){ return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement; }
+    function requestFs(el){ if (el.requestFullscreen) return el.requestFullscreen(); if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen(); if (el.msRequestFullscreen) return el.msRequestFullscreen(); }
+    function exitFs(){ if (document.exitFullscreen) return document.exitFullscreen(); if (document.webkitExitFullscreen) return document.webkitExitFullscreen(); if (document.msExitFullscreen) return document.msExitFullscreen(); }
+    function toggleFullscreen(){ isFullscreen() ? exitFs() : requestFs(container); }
     function updateFsButton(){
       const fs = !!isFullscreen();
       elFs.textContent = fs ? '退出全螢幕' : '進入全螢幕';
       elFs.title = fs ? '退出全螢幕（F）' : '全螢幕（F）';
     }
-    ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
-      document.addEventListener(ev, updateFsButton);
-    });
 
     // 工具
     function toMs({h=0,m=0,s=0}){ return ((+h||0)*3600 + (+m||0)*60 + (+s||0)) * 1000; }
-    function clampInt(v, min, max){
-      v = Math.floor(Math.abs(parseInt(v,10)||0));
-      if (v < min) v = min; if (v > max) v = max; return v;
-    }
+    function clampInt(v,min,max){ v = Math.floor(Math.abs(parseInt(v,10)||0)); return Math.max(min, Math.min(max, v)); }
     function fmt(ms){
       ms = Math.max(0, Math.floor(ms));
       const totalSec = Math.floor(ms/1000);

@@ -181,9 +181,15 @@
     let lastTick = 0;
     let running = false;
 
-    // 鈴聲播放設定（改為連續播放，不重疊）
+    // 鈴聲播放設定（連續播放，不重疊）
     const chime = { times: 3, intervalMs: 300, volume: 1.0 };
-    const bell = document.getElementById('bell'); bell.volume = chime.volume;
+
+    const bell = document.getElementById('bell');
+    bell.volume = chime.volume;
+
+    // 追蹤正在播放的音源，方便中斷
+    let activeAudios = new Set();
+    let chimeAbortController = null;
 
     // 元件
     const elTime = document.getElementById('time');
@@ -246,6 +252,7 @@
     }
     function applyPreset(ms, label){
       running = false; cancelAnimationFrame(timerId);
+      stopAllChimes();
       presetMs = Math.max(0, ms);
       remainingMs = presetMs;
       syncDisplay();
@@ -262,15 +269,23 @@
       tick();
     }
     function pause(){
-      if (!running) return;
+      if (!running) {
+        // 即使不在計時，也允許用暫停鍵中斷鈴聲
+        stopAllChimes();
+        elStatus.textContent = '已暫停';
+        return;
+      }
       running = false;
       cancelAnimationFrame(timerId);
       elStatus.textContent = '已暫停';
+      // 按下暫停鍵 -> 立刻中斷所有鈴聲
+      stopAllChimes();
     }
     function toggle(){ running ? pause() : start(); }
     function resetToPreset(){
       running = false;
       cancelAnimationFrame(timerId);
+      stopAllChimes();
       remainingMs = presetMs;
       elStatus.textContent = '已重置至目前預設';
       syncDisplay();
@@ -287,7 +302,7 @@
         elStatus.textContent = '時間到！';
         elTime.classList.add('blink');
         notify();
-        playChimeTimes(); // 連續播放，不重疊
+        playChimeTimes(); // 連續播放，不重疊；可被暫停鍵中斷
         return;
       }
       timerId = requestAnimationFrame(tick);
@@ -300,23 +315,66 @@
       elBar.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
     }
 
-    // 多次播放音檔（連續播放，不重疊：每次播放結束後再播下一次）
+    // 多次播放音檔（連續播放，不重疊，且可中斷）
     async function playChimeTimes(){
       try{
+        // 若前一次播放尚未結束，先中止
+        stopAllChimes();
+
+        // 建立新的中斷控制器
+        chimeAbortController = new AbortController();
+        const { signal } = chimeAbortController;
+
         // 預熱，避免首次播放被阻擋或無聲
         if (bell.readyState < 2){
           await bell.play().then(()=>bell.pause()).catch(()=>{});
           bell.currentTime = 0;
         }
+
         for (let i = 0; i < chime.times; i++){
+          if (signal.aborted) break;
           await new Promise(res=>{
             const a = bell.cloneNode(true);
             a.volume = bell.volume;
-            a.addEventListener('ended', ()=>{ a.remove(); setTimeout(res, chime.intervalMs); });
+            activeAudios.add(a);
+            a.addEventListener('ended', ()=>{
+              a.remove();
+              activeAudios.delete(a);
+              // 播放間隔
+              setTimeout(res, chime.intervalMs);
+            });
+            // 若播放失敗或被中斷，直接繼續
+            a.play().catch(()=>res());
+            // 若被中斷，立即停止此音源並繼續
+            const onAbort = ()=>{
+              try{ a.pause(); }catch(e){}
+              try{ a.currentTime = 0; }catch(e){}
+              try{ a.remove(); }catch(e){}
+              activeAudios.delete(a);
+              res();
+            };
+            if (signal.aborted) onAbort();
+            else signal.addEventListener('abort', onAbort, { once:true });
             document.body.appendChild(a);
-            a.play().catch(()=>res()); // 若播放被阻擋則直接繼續
           });
         }
+      }catch(e){}
+    }
+
+    // 立即停止所有鈴聲播放（含排程）
+    function stopAllChimes(){
+      try{
+        if (chimeAbortController){
+          chimeAbortController.abort();
+          chimeAbortController = null;
+        }
+        // 停止並清理所有已建立的 audio 實例
+        activeAudios.forEach(a=>{
+          try{ a.pause(); }catch(e){}
+          try{ a.currentTime = 0; }catch(e){}
+          try{ a.remove(); }catch(e){}
+        });
+        activeAudios.clear();
       }catch(e){}
     }
 

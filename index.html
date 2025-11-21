@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>倒計時器（置中＆alarm.mp3）</title>
-  <meta name="description" content="可自訂時間、全螢幕、桌面通知；時間到播放 alarm.mp3（可多次）。全螢幕置中顯示。" />
+  <title>倒計時器（雙預設，免套用 | 全螢幕置中）</title>
+  <meta name="description" content="雙組預設時間（A/B），直接載入欄位數值即套用，無需套用鍵；全螢幕置中，快捷鍵齊全。" />
   <style>
     :root{
       --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --muted:#9ca3af;
@@ -19,14 +19,14 @@
       background: radial-gradient(1200px 800px at 80% -10%, #1f2937 0%, var(--bg) 60%);
       color:var(--text);
       display:flex;
-      align-items:center;          /* 垂直置中 */
-      justify-content:center;      /* 水平置中 */
+      align-items:center;
+      justify-content:center;
       padding:16px;
       min-height:100vh;
     }
     .wrap{
       width:100%;
-      max-width:560px;
+      max-width:720px;
       background:rgba(17,24,39,.65);
       backdrop-filter: blur(8px);
       border:1px solid rgba(148,163,184,.15);
@@ -37,18 +37,26 @@
       flex-direction:column;
       gap:14px;
     }
-    header{
-      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    header{ display:flex; flex-direction:column; gap:12px; }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     }
     .title{ font-weight:700; letter-spacing:.2px; font-size:18px; }
-    .preset{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .preset label{ font-size:12px; color:var(--muted); }
-    .preset input{
-      width:68px; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25);
+    .preset-row{
+      display:grid; gap:10px; align-items:center;
+      grid-template-columns: auto repeat(3, 80px) auto; /* 標籤 HH MM SS 載入 */
+    }
+    @media (max-width:560px){
+      .preset-row{ grid-template-columns: auto repeat(3, 1fr); }
+      .preset-row .load{ grid-column: 1 / -1; justify-self:start; }
+    }
+    .preset-row label{ font-size:12px; color:var(--muted); }
+    .preset-row input{
+      width:100%; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25);
       background:#0b1220; color:var(--text); outline:none; -moz-appearance: textfield;
     }
-    .preset input::-webkit-outer-spin-button,.preset input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
-    .preset input:focus{ box-shadow:0 0 0 4px var(--ring); border-color:#3b82f640; }
+    .preset-row input::-webkit-outer-spin-button,.preset-row input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+    .preset-row input:focus{ box-shadow:0 0 0 4px var(--ring); border-color:#3b82f640; }
     .screen{
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       padding:22px 16px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
@@ -64,7 +72,7 @@
     .bar{ height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s ease; }
     .btns{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:18px; width:100%; }
     button{
-      padding:12px 14px; border-radius:12px; border:1px solid transparent;
+      padding:10px 12px; border-radius:12px; border:1px solid transparent;
       background:#1f2937; color:var(--text); font-weight:700; letter-spacing:.2px; cursor:pointer;
       transition:.2s transform, .2s background, .2s border-color; outline:none; min-width:0;
     }
@@ -78,13 +86,13 @@
     .small{ font-size:12px; color:var(--muted); }
     footer{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 
-    /* 全螢幕：用三列網格布局，讓 screen 永遠在中間置中 */
+    /* 全螢幕置中：三列網格 */
     :fullscreen .wrap, .wrap:fullscreen{
       max-width:none; width:100%; height:100%;
       background:rgba(17,24,39,.7);
       display:grid;
-      grid-template-rows: auto 1fr auto; /* header / screen / footer */
-      justify-items:center;             /* 水平置中每列內容 */
+      grid-template-rows: auto 1fr auto;
+      justify-items:center;
       align-items:stretch;
       padding:24px;
       box-sizing:border-box;
@@ -101,8 +109,8 @@
       margin:0 auto;
       display:flex;
       flex-direction:column;
-      justify-content:center;   /* 垂直置中 screen 內容 */
-      align-items:center;       /* 水平置中 screen 內容 */
+      justify-content:center;
+      align-items:center;
     }
     :fullscreen .time, .wrap:fullscreen .time{
       font-size:min(16vw, 160px);
@@ -116,14 +124,29 @@
 <body>
   <div class="wrap" id="container">
     <header>
-      <div class="title">倒計時器</div>
-      <div class="preset" aria-label="預設倒數時間">
-        <label>預設時間</label>
-        <input id="hh" type="number" min="0" step="1" value="0" aria-label="小時" />
-        <input id="mm" type="number" min="0" max="59" step="1" value="1" aria-label="分鐘" />
-        <input id="ss" type="number" min="0" max="59" step="1" value="30" aria-label="秒" />
-        <button id="apply" class="ghost" title="套用上方預設時間（不會打斷當前計時）">套用</button>
-        <button id="fs" class="ghost" title="全螢幕（F）">進入全螢幕</button>
+      <div class="topbar">
+        <div class="title">倒計時器（雙預設｜免套用）</div>
+        <div class="top-buttons" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="fs" class="ghost" title="全螢幕（F）">進入全螢幕</button>
+        </div>
+      </div>
+
+      <!-- 預設 A -->
+      <div class="preset-row" aria-label="預設 A">
+        <label for="a-hh">預設 A</label>
+        <input id="a-hh" type="number" min="0" step="1" value="0" aria-label="A 小時" />
+        <input id="a-mm" type="number" min="0" max="59" step="1" value="5" aria-label="A 分鐘" />
+        <input id="a-ss" type="number" min="0" max="59" step="1" value="0" aria-label="A 秒" />
+        <button id="loadA" class="ghost load" title="將目前倒數重置為 A 欄位數值（L）">載入 A</button>
+      </div>
+
+      <!-- 預設 B -->
+      <div class="preset-row" aria-label="預設 B">
+        <label for="b-hh">預設 B</label>
+        <input id="b-hh" type="number" min="0" step="1" value="0" aria-label="B 小時" />
+        <input id="b-mm" type="number" min="0" max="59" step="1" value="1" aria-label="B 分鐘" />
+        <input id="b-ss" type="number" min="0" max="59" step="1" value="30" aria-label="B 秒" />
+        <button id="loadB" class="ghost load" title="將目前倒數重置為 B 欄位數值（K）">載入 B</button>
       </div>
     </header>
 
@@ -139,18 +162,21 @@
     </section>
 
     <footer>
-      <div class="small">鍵盤：<span class="kbd">Space</span> 開始/暫停，<span class="kbd">R</span> 重置，<span class="kbd">F</span> 全螢幕</div>
+      <div class="small">
+        鍵盤：Space 開始/暫停，R 重置，F 全螢幕，L 載入 A，K 載入 B
+      </div>
       <div class="small">時間到播放 alarm.mp3（預設 3 次）。</div>
     </footer>
   </div>
 
-  <!-- 音效檔：位於根目錄 alarm.mp3 -->
   <audio id="bell" src="alarm.mp3" preload="auto"></audio>
 
   <script>
-    // 狀態
+    // 目前使用中的預設時長（動態由載入 A/B 直接讀取輸入欄位）
     let presetMs = toMs({h:0,m:1,s:30});
     let remainingMs = presetMs;
+
+    // 計時狀態
     let timerId = null;
     let lastTick = 0;
     let running = false;
@@ -166,14 +192,20 @@
     const elStart = document.getElementById('start');
     const elPause = document.getElementById('pause');
     const elReset = document.getElementById('reset');
-    const elHH = document.getElementById('hh');
-    const elMM = document.getElementById('mm');
-    const elSS = document.getElementById('ss');
-    const elApply = document.getElementById('apply');
+    // 預設欄位
+    const aHH = document.getElementById('a-hh');
+    const aMM = document.getElementById('a-mm');
+    const aSS = document.getElementById('a-ss');
+    const bHH = document.getElementById('b-hh');
+    const bMM = document.getElementById('b-mm');
+    const bSS = document.getElementById('b-ss');
+    // 按鈕
+    const btnLoadA = document.getElementById('loadA');
+    const btnLoadB = document.getElementById('loadB');
     const elFs = document.getElementById('fs');
     const container = document.getElementById('container');
 
-    // 初始化
+    // 初始畫面
     syncDisplay();
     updateFsButton();
 
@@ -181,16 +213,44 @@
     elStart.addEventListener('click', () => { unlockAudio(); start(); });
     elPause.addEventListener('click', pause);
     elReset.addEventListener('click', resetToPreset);
-    elApply.addEventListener('click', applyPresetFromInputs);
+    btnLoadA.addEventListener('click', loadA);
+    btnLoadB.addEventListener('click', loadB);
     elFs.addEventListener('click', toggleFullscreen);
+
     document.addEventListener('keydown', (e)=>{
       if (e.code === 'Space'){ e.preventDefault(); unlockAudio(); toggle(); }
       if (e.key === 'r' || e.key === 'R'){ e.preventDefault(); resetToPreset(); }
       if (e.key === 'f' || e.key === 'F'){ e.preventDefault(); toggleFullscreen(); }
+      if (e.key === 'l' || e.key === 'L'){ e.preventDefault(); loadA(); }
+      if (e.key === 'k' || e.key === 'K'){ e.preventDefault(); loadB(); }
     });
     ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
       document.addEventListener(ev, updateFsButton);
     });
+
+    // 直接載入欄位數值（免套用）
+    function loadA(){
+      const ms = readInputsToMs(aHH, aMM, aSS);
+      applyPreset(ms, '已載入 A');
+    }
+    function loadB(){
+      const ms = readInputsToMs(bHH, bMM, bSS);
+      applyPreset(ms, '已載入 B');
+    }
+    function readInputsToMs(hEl, mEl, sEl){
+      const h = clampInt(hEl.value, 0, 99);
+      const m = clampInt(mEl.value, 0, 59);
+      const s = clampInt(sEl.value, 0, 59);
+      hEl.value = h; mEl.value = m; sEl.value = s; // 回填規範值
+      return toMs({h,m,s});
+    }
+    function applyPreset(ms, label){
+      running = false; cancelAnimationFrame(timerId);
+      presetMs = Math.max(0, ms);
+      remainingMs = presetMs;
+      syncDisplay();
+      elStatus.textContent = label || '已載入預設';
+    }
 
     // 主邏輯
     function start(){
@@ -212,20 +272,8 @@
       running = false;
       cancelAnimationFrame(timerId);
       remainingMs = presetMs;
-      elStatus.textContent = '已重置至預設時間';
+      elStatus.textContent = '已重置至目前預設';
       syncDisplay();
-    }
-    function applyPresetFromInputs(){
-      const h = clampInt(elHH.value, 0, 99);
-      const m = clampInt(elMM.value, 0, 59);
-      const s = clampInt(elSS.value, 0, 59);
-      elHH.value = h; elMM.value = m; elSS.value = s;
-      presetMs = toMs({h, m, s});
-      if (!running){
-        remainingMs = presetMs; syncDisplay(); elStatus.textContent = '已更新預設時間';
-      }else{
-        elStatus.textContent = '已更新預設時間（重置後生效）';
-      }
     }
     function tick(){
       if (!running) return;
@@ -247,7 +295,8 @@
     function syncDisplay(){
       elTime.classList.toggle('blink', remainingMs <= 0);
       elTime.textContent = fmt(remainingMs);
-      const ratio = presetMs > 0 ? 1 - (remainingMs / presetMs) : 1;
+      const base = Math.max(1, presetMs); // 避免除以 0
+      const ratio = 1 - (remainingMs / base);
       elBar.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
     }
 

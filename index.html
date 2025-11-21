@@ -86,6 +86,17 @@
     .small{ font-size:12px; color:var(--muted); }
     footer{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 
+    /* 控制列（播放模式/次數/間隔/版本） */
+    .controls{
+      display:grid; gap:8px; grid-template-columns: 1fr 1fr 1fr 1fr auto; align-items:end;
+    }
+    .controls label{ font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+    .controls select, .controls input{
+      width:100%; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25);
+      background:#0b1220; color:var(--text); outline:none;
+    }
+    .controls .test-btn{ justify-self: end; }
+
     /* 全螢幕置中：三列網格 */
     :fullscreen .wrap, .wrap:fullscreen{
       max-width:none; width:100%; height:100%;
@@ -148,6 +159,33 @@
         <input id="b-ss" type="number" min="0" max="59" step="1" value="30" aria-label="B 秒" />
         <button id="loadB" class="ghost load" title="將目前倒數重置為 B 欄位數值（K）">載入 B</button>
       </div>
+
+      <!-- 播放模式控制 -->
+      <div class="controls" aria-label="播放模式控制">
+        <div>
+          <label for="mode">模式</label>
+          <select id="mode" aria-label="播放模式">
+            <option value="sequential" selected>連續（不重疊）</option>
+            <option value="overlap">重疊</option>
+            <option value="echo">回聲</option>
+          </select>
+        </div>
+        <div>
+          <label for="times">次數</label>
+          <input id="times" type="number" min="1" max="10" step="1" value="3" aria-label="播放次數" />
+        </div>
+        <div>
+          <label for="interval">間隔(ms)</label>
+          <input id="interval" type="number" min="50" max="2000" step="10" value="300" aria-label="間隔毫秒" />
+        </div>
+        <div>
+          <label for="version">音檔版本參數</label>
+          <input id="version" type="text" placeholder="例如 20251121" aria-label="版本參數" />
+        </div>
+        <div class="test-btn">
+          <button id="test" class="ghost" title="測試目前音檔與模式">測試鈴聲</button>
+        </div>
+      </div>
     </header>
 
     <section class="screen" role="timer" aria-live="polite" aria-atomic="true">
@@ -169,6 +207,7 @@
     </footer>
   </div>
 
+  <!-- 音檔路徑可加版本參數避免快取 -->
   <audio id="bell" src="alarm.mp3" preload="auto"></audio>
 
   <script>
@@ -181,8 +220,15 @@
     let lastTick = 0;
     let running = false;
 
-    // 鈴聲播放設定
-    const chime = { times: 3, intervalMs: 300, volume: 1.0 };
+    // 播放控制 UI 元件
+    const elMode = document.getElementById('mode');
+    const elTimes = document.getElementById('times');
+    const elInterval = document.getElementById('interval');
+    const elVersion = document.getElementById('version');
+    const elTest = document.getElementById('test');
+
+    // 鈴聲播放設定（預設改為連續播放，避免重疊造成聽感差異）
+    const chime = { mode: 'sequential', times: 3, intervalMs: 300, volume: 1.0 };
     const bell = document.getElementById('bell'); bell.volume = chime.volume;
 
     // 元件
@@ -208,6 +254,10 @@
     // 初始畫面
     syncDisplay();
     updateFsButton();
+    // 初始化控制列與事件
+    elMode.value = chime.mode;
+    elTimes.value = chime.times;
+    elInterval.value = chime.intervalMs;
 
     // 事件
     elStart.addEventListener('click', () => { unlockAudio(); start(); });
@@ -227,6 +277,22 @@
     ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
       document.addEventListener(ev, updateFsButton);
     });
+
+    // 控制列事件
+    elMode.addEventListener('change', ()=> chime.mode = elMode.value);
+    elTimes.addEventListener('change', ()=> chime.times = clampInt(elTimes.value, 1, 10));
+    elInterval.addEventListener('change', ()=> chime.intervalMs = clampInt(elInterval.value, 50, 2000));
+    elTest.addEventListener('click', ()=>{ unlockAudio(); playChimeTimes(true); });
+    elVersion.addEventListener('change', applyVersionParam);
+
+    function applyVersionParam(){
+      const v = (elVersion.value || '').trim();
+      const base = 'alarm.mp3';
+      const url = v ? `${base}?v=${encodeURIComponent(v)}` : base;
+      bell.src = url;
+      // 預熱重新載入
+      bell.load();
+    }
 
     // 直接載入欄位數值（免套用）
     function loadA(){
@@ -300,23 +366,86 @@
       elBar.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
     }
 
-    // 多次播放音檔
-    async function playChimeTimes(){
+    // 播放多次（支援三種模式）
+    async function playChimeTimes(byTestButton = false){
       try{
+        // 預熱音訊，避免第一次無聲
         if (bell.readyState < 2){
           await bell.play().then(()=>bell.pause()).catch(()=>{});
           bell.currentTime = 0;
         }
-        for (let i = 0; i < chime.times; i++){
-          setTimeout(()=>{
-            try{
+
+        // 從 UI 讀取最新參數
+        const mode = chime.mode;
+        const times = clampInt(elTimes.value, 1, 10);
+        const interval = clampInt(elInterval.value, 50, 2000);
+
+        if (mode === 'overlap'){
+          // 重疊播放：保留原本的疊加效果（可能聽感較刺耳）
+          for (let i = 0; i < times; i++){
+            setTimeout(()=>{
+              try{
+                const a = bell.cloneNode(true);
+                a.volume = bell.volume;
+                a.addEventListener('ended', ()=> a.remove());
+                document.body.appendChild(a);
+                a.play().catch(()=>{});
+              }catch(e){}
+            }, i * interval);
+          }
+        } else if (mode === 'sequential'){
+          // 連續播放：上一個結束後再播下一個，不重疊，聲音最接近檔案原音
+          for (let i = 0; i < times; i++){
+            await new Promise(res=>{
               const a = bell.cloneNode(true);
               a.volume = bell.volume;
-              a.addEventListener('ended', ()=> a.remove());
+              a.addEventListener('ended', ()=>{ a.remove(); setTimeout(res, interval); });
               document.body.appendChild(a);
-              a.play().catch(()=>{});
-            }catch(e){}
-          }, i * chime.intervalMs);
+              a.play().catch(()=>res()); // 若被阻擋則直接繼續
+            });
+          }
+        } else if (mode === 'echo'){
+          // 回聲模式：一次觸發，使用 Web Audio API 做短回聲與衰減
+          await echoPlay(times, interval);
+        }
+
+        if (byTestButton){
+          elStatus.textContent = '已播放測試鈴聲';
+          setTimeout(()=>{ elStatus.textContent = running ? '計時中…' : '已就緒'; }, 1200);
+        }
+      }catch(e){}
+    }
+
+    // Web Audio 回聲
+    let audioCtx;
+    async function echoPlay(times, interval){
+      try{
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended'){ try{ await audioCtx.resume(); }catch(e){} }
+
+        // 下載並快取音訊 Buffer（帶 cache: 'reload' 避免舊快取）
+        if (!echoPlay._buffer){
+          const res = await fetch(document.getElementById('bell').src, { cache:'reload' }).catch(()=>null);
+          if (!res || !res.ok) return;
+          const arr = await res.arrayBuffer();
+          echoPlay._buffer = await audioCtx.decodeAudioData(arr);
+        }
+        const buffer = echoPlay._buffer;
+
+        // 基本參數：baseGain 為主聲音量，decay 為每次回聲衰減比例
+        const baseGain = bell.volume;
+        const decay = 0.65;
+        const gapSec = Math.max(0.05, interval / 1000);
+
+        const now = audioCtx.currentTime;
+        for (let i = 0; i < times; i++){
+          const src = audioCtx.createBufferSource(); src.buffer = buffer;
+          const gain = audioCtx.createGain();
+          const t = now + i * gapSec;
+          const vol = baseGain * Math.pow(decay, i);
+          gain.gain.setValueAtTime(Math.min(1, vol), t);
+          src.connect(gain).connect(audioCtx.destination);
+          src.start(t);
         }
       }catch(e){}
     }
